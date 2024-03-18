@@ -1,3 +1,5 @@
+rm(list = ls())
+
 # Define the base sequence
 base_sequence <- "GCAT"
 
@@ -72,6 +74,9 @@ generate_new_sequence <- function(base_sequence, mu, branch_length) {
   return(new_sequence)
 }
 
+# Generate new sequence using the previous sequence
+new_sequence <- generate_new_sequence(previous_sequence, mu, branch_length)
+new_sequence
 
 library(ape)
 
@@ -96,6 +101,9 @@ tree <- read.tree(text = tree_newick)
 # Plot the tree with adjusted parameters
 plot(tree, cex = 0.8, label.offset = 0.01)
 
+tree$edge.length
+nodeHeights(tree)
+tree$edge
 
 
 
