@@ -10,7 +10,7 @@ nucleotide_mapping <- c(A = 1, T = 2, C = 3, G = 4)
 numeric_sequence <- sapply(strsplit(base_sequence, "")[[1]], function(nucleotide) nucleotide_mapping[nucleotide])
 
 # Define the number of sequences to generate
-num_sequences <- 6
+num_sequences <- 3
 
 # Define the Jukes-Cantor model parameter
 mu <- 5
@@ -18,31 +18,22 @@ mu <- 5
 # Define the alphabet of nucleotides
 nucleotides <- c("A", "T", "C", "G")
 
-# Function to generate random branch lengths from exponential distribution with parameter 10
-generate_branch_lengths <- function(num_branches) {
-  rexp(num_branches, rate = 10)
-}
-
-# Generate random branch lengths
-branch_length <- generate_branch_lengths(num_sequences - 2)
-
 # Function to calculate Jukes-Cantor model probabilities with custom transition probability matrix
 calculate_transition_probs <- function(branch_length, mu) {
   # Initialize an empty list to store transition probability matrices
   transition_matrices <- list()
   
-  # Loop over each branch length
+  # Loop over each branch length*
   for (bl in branch_length) {
     # Compute the probabilities for same and different nucleotides
     p_same <- 1 - 3/4 * exp(-4/3 * mu * bl)
     p_diff <- 1/4 * exp(-4/3 * mu * bl)
     
-    # Create the transition probability matrix directly
-    transition_matrix <- matrix(c(p_same, p_diff, p_diff, p_diff,
-                                  p_diff, p_same, p_diff, p_diff,
-                                  p_diff, p_diff, p_same, p_diff,
-                                  p_diff, p_diff, p_diff, p_same), 
-                                nrow = 4, byrow = TRUE)
+    # Create the transition probability matrix with p_diff
+    transition_matrix <- matrix(rep(p_diff, 16), nrow = 4, byrow = TRUE)
+    
+    # Change the diagonal elements to p_same
+    diag(transition_matrix) <- rep(p_same, 4)
     
     # Append the transition matrix to the list
     transition_matrices[[length(transition_matrices) + 1]] <- transition_matrix
@@ -59,6 +50,9 @@ generate_new_sequence <- function(base_sequence, mu, branch_length) {
   # Initialize new sequence
   new_sequence <- ""
   
+  # Convert the base sequence to numeric representation
+  numeric_sequence <- sapply(strsplit(base_sequence, "")[[1]], function(nucleotide) nucleotide_mapping[nucleotide])
+  
   # Loop through each base in the base sequence
   for (base in numeric_sequence) {
     # Determine the transition probabilities for this base
@@ -74,36 +68,38 @@ generate_new_sequence <- function(base_sequence, mu, branch_length) {
   return(new_sequence)
 }
 
-# Generate new sequence using the previous sequence
-new_sequence <- generate_new_sequence(previous_sequence, mu, branch_length)
-new_sequence
+
 
 library(ape)
 
-# Generate sequences for the branches
-branch1 <- generate_new_sequence(base_sequence, mu, branch_length)
-branch2 <- generate_new_sequence(base_sequence, mu, branch_length)
-branch3 <- generate_new_sequence(base_sequence, mu, branch_length)
-branch4 <- generate_new_sequence(base_sequence, mu, branch_length)
-branch5 <- generate_new_sequence(base_sequence, mu, branch_length)
-branch6 <- generate_new_sequence(base_sequence, mu, branch_length)
 
+# Set the number of tips (leaves) in the tree
+num_tips <- 6
 
-# Define the Newick tree string with branch lengths
-# Concatenate branch lengths to the Newick tree string
-tree_newick <- paste0("(((", branch1, ":",1- branch_length[1], ",", branch2, ":",1- branch_length[1], "):", branch_length[2], ",", 
-                      "(", branch3, ":",1 -  branch_length[4], ",", branch4, ":",1- branch_length[4], "):", branch_length[4], "):", branch_length[2], ",", 
-                      "(", branch5, ":", 1 -branch_length[3], ",", branch6, ":", 1- branch_length[3], "):", branch_length[4], ");")
+# Create a star tree with the specified number of tips
+star_tree <- rcoal(num_tips,br = sort(rexp(num_tips-1, rate = 10),decreasing = FALSE))
 
-# Create the phylogenetic tree object
-tree <- read.tree(text = tree_newick)
+# Plot the ladder-like tree
+tree_structure <- plot(star_tree, cex = 0.6)
 
-# Plot the tree with adjusted parameters
-plot(tree, cex = 0.8, label.offset = 0.01)
-
-tree$edge.length
-nodeHeights(tree)
-tree$edge
+branch_length_new = sort(star_tree$edge.length,decreasing = TRUE)
+branch1 <- generate_new_sequence(base_sequence, mu, branch_length_new[1])
+branch2 <- generate_new_sequence(base_sequence, mu, branch_length_new[2])
+branch3 <- generate_new_sequence(branch2, mu, branch_length_new[3])
+branch4 <- generate_new_sequence(branch2, mu, branch_length_new[4])
+branch5 <- generate_new_sequence(branch4, mu, branch_length_new[5])
+branch6 <- generate_new_sequence(branch4, mu, branch_length_new[8])
+branch7 <- generate_new_sequence(branch5, mu, branch_length_new[9])
+branch8 <- generate_new_sequence(branch5, mu, branch_length_new[10])
+branch9 <- generate_new_sequence(branch6, mu, branch_length_new[6])
+branch10 <- generate_new_sequence(branch6, mu, branch_length_new[7])
 
 
 
+star_tree$tip.label = c(branch3,branch9,branch10,branch7,branch8,branch1)
+
+tree_structure_final <- plot(star_tree, cex = 0.6)
+
+# Save the final tree plot as an image file
+# Save the tree_structure_plot object
+save(tree_structure_final, file = "tree_structure_plot.RData")
