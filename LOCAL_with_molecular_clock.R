@@ -2,14 +2,16 @@ library(igraph)
 library(phytools)
 
 
-# Define a function to propose a new phylogeny tree
-propose_new_tree <- function(current_tree, sequence_names) {
-  # Copy the current tree to the proposed tree
-  proposed_tree <- current_tree
-  
+propose_new_tree <- function(tree, sequence_names) {
+  proposed_tree <- tree
+  current_tree <- tree
   # Step 1: Choose a random internal branch
   # Get the edge matrix directly from the tree object
-  edge_matrix <- tree$edge
+  edge_matrix <- current_tree$edge
+
+  # Get the leaves
+  leaves <- setdiff(unique(edge_matrix), edge_matrix[, 1])
+  
   
   # Filter out internal edges
   internal_edges <- edge_matrix[edge_matrix[, 2] > Ntip(tree), ]
@@ -29,39 +31,46 @@ propose_new_tree <- function(current_tree, sequence_names) {
   children_u <- tree$edge[which(tree$edge[, 1] == u),][,2]
   children_v <- tree$edge[which(tree$edge[, 1] == v & tree$edge[, 2] != u), , drop = FALSE][,2]
   children_all <- c(children_u,children_v)
+  
   # Get the heights of nodes a, b, and c above v
   heights <- nodeHeights(proposed_tree)
-  heights_u <- (heights[which(tree$edge[, 1] == u),][,2])
-  heights_v <- heights[which(tree$edge[, 1] == v & tree$edge[, 2] != u), , drop = FALSE][, 2]
+  heights_u <- (heights[which(tree$edge[, 1] == u),][,2]) - (heights[which(tree$edge[, 1] == u),][,1])
+  heights_v <- heights[which(tree$edge[, 1] == v & tree$edge[, 2] != u), , drop = FALSE][, 2] - heights[which(tree$edge[, 1] == v & tree$edge[, 2] != u), , drop = FALSE][, 1]
 
   height_children <- c(heights_u,heights_v)
-  # Filter heights greater than 0
+
   filtered_heights <- height_children[height_children > 0]
+  
   # Sort the filtered heights
   sorted_heights <- unique(sort(filtered_heights))
+  
   h1 <- sorted_heights[1]
   h2 <- sorted_heights[2]
   h3 <- sorted_heights[3]
   
-  # Compute the proposed distance between v and the nearest child
-  proposed_distance <- runif(1) * h1
+  x <- runif(1) * h1
+  y <- runif(1) * h2
   
-  # Compute the proposed location of u
-  proposed_height_u <- runif(1) * h2
+  proposed_height_u = max(x,y)
+  proposed_height_v = min(x,y)
   
-  # Check if the proposed position of u is closer to v
-  if (proposed_height_u < proposed_distance) {
+  
+  # Convert phylogenetic tree to graph object
+  proposed_tree_graph <- as.igraph(proposed_tree)
+
+    # Check if the proposed position of u is closer to v
+  if (proposed_height_u < h1) {
     # Connect one of the three children nodes to v and connect the others to u
     # Randomly choose one child to connect to v
-    child_to_connect <- sample(children_v, 1)
+    child_to_connect <- sample(children_all, 1)
     # Connect the other children to u
-    children_to_connect_to_u <- setdiff(children_v, child_to_connect)
+    children_to_connect_to_u <- setdiff(children_all, child_to_connect)
     
     # Connect nodes
-    proposed_tree <- drop.tip(proposed_tree, children_to_connect_to_u)
-    proposed_tree <- drop.tip(proposed_tree, v)
-    proposed_tree <- bind.tree(proposed_tree, u, v)
-    proposed_tree <- bind.tree(proposed_tree, children_to_connect_to_u, u)
+    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == u & proposed_tree_graph$edges[,2] == child_to_connect))
+    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == v & proposed_tree_graph$edges[,2] == child_to_connect))
+    proposed_tree_graph <- add_edges(proposed_tree_graph, c(u, child_to_connect))
+    proposed_tree_graph <- add_edges(proposed_tree_graph, c(v, children_to_connect_to_u))
   } else {
     # Force the tree topology and connect the lowest child to v
     child_to_connect <- children_all[which.min((height_children))]
@@ -69,15 +78,16 @@ propose_new_tree <- function(current_tree, sequence_names) {
     children_to_connect_to_u <- setdiff(children_all, child_to_connect)
     
     # Connect nodes
-    proposed_tree <- add.edge(proposed_tree, c(u, child_to_connect))
-    proposed_tree <- add_edges(proposed_tree, c(u, children_to_connect_to_u))
-    proposed_tree <- drop.tip(proposed_tree, node = v)
+    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == v & proposed_tree_graph$edges[,2] == child_to_connect))
+    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == u & proposed_tree_graph$edges[,2] == child_to_connect))
+    proposed_tree_graph <- add_edges(proposed_tree_graph, c(v, child_to_connect))
+    proposed_tree_graph <- add_edges(proposed_tree_graph, c(u, children_to_connect_to_u))
   }
   
-  # Step 3: Acceptance/Rejection stage (Metropolis-Hastings)
-  # Calculate the Metropolis-Hastings acceptance probability based on the likelihood of the proposed tree modification
-  # Generate a random number from a uniform distribution
-  # Accept or reject the proposed tree modification based on the acceptance probability
+  # Convert back to phylogenetic tree object
+  proposed_tree <- igraph_to_phylo(proposed_tree_graph)
+  
+  # Step 3: Acceptance/Rejection stage 
   
   # Calculate the likelihood of the proposed tree modification using the PML method
   likelihood_proposed <- calculate_likelihood(proposed_tree, sequence_names)
@@ -105,22 +115,3 @@ propose_new_tree <- function(current_tree, sequence_names) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-## load tree
-data(vertebrate.tree)
-vertebrate.tree$edge
-## compute height of all nodes
-H<-nodeHeights(vertebrate.tree)
-print(H)
-## compute total tree depth
-max(H)
