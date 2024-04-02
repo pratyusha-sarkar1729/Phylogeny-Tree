@@ -5,7 +5,7 @@ library(phytools)
 propose_new_tree <- function(tree, sequence_names) {
   proposed_tree <- tree
   current_tree <- tree
-  # Step 1: Choose a random internal branch
+  # Choose a random internal branch
   # Get the edge matrix directly from the tree object
   edge_matrix <- current_tree$edge
 
@@ -26,7 +26,7 @@ propose_new_tree <- function(tree, sequence_names) {
   u <- selected_internal_edge[[2]]
   v <- selected_internal_edge[[1]]
   
-  # Step 2: Modify the tree topology
+  # Modify the tree topology
   # Get children of nodes u and v
   children_u <- tree$edge[which(tree$edge[, 1] == u),][,2]
   children_v <- tree$edge[which(tree$edge[, 1] == v & tree$edge[, 2] != u), , drop = FALSE][,2]
@@ -67,10 +67,13 @@ propose_new_tree <- function(tree, sequence_names) {
     children_to_connect_to_u <- setdiff(children_all, child_to_connect)
     
     # Connect nodes
-    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == u & proposed_tree_graph$edges[,2] == child_to_connect))
-    proposed_tree_graph <- delete_edges(proposed_tree_graph, which(proposed_tree_graph$edges[,1] == v & proposed_tree_graph$edges[,2] == child_to_connect))
-    proposed_tree_graph <- add_edges(proposed_tree_graph, c(u, child_to_connect))
-    proposed_tree_graph <- add_edges(proposed_tree_graph, c(v, children_to_connect_to_u))
+    clade_tree_u <- extract.clade(proposed_tree,u)
+    clade_tree_v <- extract.clade(proposed_tree,children_v)
+    clade_tree_u$root.edge <- clade_tree_v$root.edge <- a <- .2
+    z = bind.tree(clade_tree_u, clade_tree_v,po = 0.2)
+    a = setdiff(star_tree$tip.label, c(clade_tree_u$tip.label, clade_tree_v$tip.label))
+    plot(z)
+    plot(bind.tip(z,a,edge.length = branch_length_new[1],po = .02))
   } else {
     # Force the tree topology and connect the lowest child to v
     child_to_connect <- children_all[which.min((height_children))]
@@ -87,7 +90,7 @@ propose_new_tree <- function(tree, sequence_names) {
   # Convert back to phylogenetic tree object
   proposed_tree <- igraph_to_phylo(proposed_tree_graph)
   
-  # Step 3: Acceptance/Rejection stage 
+  # Acceptance/Rejection stage 
   
   # Calculate the likelihood of the proposed tree modification using the PML method
   likelihood_proposed <- calculate_likelihood(proposed_tree, sequence_names)
